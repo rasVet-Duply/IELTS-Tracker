@@ -1,0 +1,65 @@
+name: Build IELTS Tracker APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract project archive
+        run: |
+          mkdir project
+          unzip ielts-tracker-github-ready.zip -d project
+          find project -maxdepth 3 -type f | head -100
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        working-directory: project
+        run: npm ci
+
+      - name: Run tests
+        working-directory: project
+        run: npm test
+
+      - name: Build web application
+        working-directory: project
+        run: npm run build
+
+      - name: Sync Android project
+        working-directory: project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: project/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ielts-tracker-apk
+          path: project/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
